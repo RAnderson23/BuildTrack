@@ -297,6 +297,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Product routes for automated SKU management
+  app.get('/api/products', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const products = await storage.getProducts(userId);
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.post('/api/products', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const productData = insertProductSchema.parse({ ...req.body, userId });
+      
+      // Auto-generate SKU if not provided
+      if (!productData.sku) {
+        productData.sku = await storage.generateNextSku(userId, productData.category);
+      }
+      
+      const product = await storage.createProduct(productData);
+      res.json(product);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      res.status(400).json({ message: "Failed to create product" });
+    }
+  });
+
+  app.get('/api/products/similar/:name', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name } = req.params;
+      const similar = await storage.findSimilarProducts(userId, decodeURIComponent(name));
+      res.json(similar);
+    } catch (error) {
+      console.error("Error finding similar products:", error);
+      res.status(500).json({ message: "Failed to find similar products" });
+    }
+  });
+
   // Dashboard stats
   app.get("/api/dashboard/stats", isAuthenticated, async (req: any, res) => {
     try {

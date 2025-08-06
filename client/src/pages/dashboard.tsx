@@ -180,7 +180,7 @@ export default function Dashboard() {
               <div className="p-4 text-center text-slate-500">
                 <Building className="mx-auto w-8 h-8 mb-2 text-slate-400" />
                 <p>No projects yet</p>
-                <Button variant="link" className="mt-2">
+                <Button variant="link" className="mt-2" onClick={() => window.location.href = '/projects'}>
                   Create your first project
                 </Button>
               </div>

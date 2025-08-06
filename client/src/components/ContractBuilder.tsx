@@ -58,17 +58,33 @@ export default function ContractBuilder({ projects, className }: ContractBuilder
     ));
   };
 
-  const calculateSubtotal = () => {
-    return lineItems.reduce((sum, item) => {
-      const quantity = parseFloat(item.quantity) || 0;
-      const unitPrice = parseFloat(item.unitPrice) || 0;
-      return sum + (quantity * unitPrice);
+  const calculateTotals = () => {
+    const subtotal = lineItems.reduce((sum, item) => {
+      const qty = parseFloat(item.quantity) || 0;
+      const price = parseFloat(item.unitPrice) || 0;
+      return sum + (qty * price);
     }, 0);
+    const tax = subtotal * 0.085;
+    const total = subtotal + tax;
+    return { subtotal, tax, total };
   };
 
-  const subtotal = calculateSubtotal();
-  const tax = subtotal * 0.085; // 8.5% tax
-  const total = subtotal + tax;
+  const { subtotal, tax, total } = calculateTotals();
+
+  const handleSave = (type: 'estimate' | 'contract') => {
+    console.log(`Saving as ${type}:`, {
+      type,
+      project: selectedProject,
+      date: contractDate,
+      lineItems: lineItems.filter(item => item.description.trim() !== ''),
+      subtotal,
+      tax,
+      total
+    });
+    // TODO: Implement API call to save contract/estimate
+  };
+
+
 
   return (
     <Card className={cn("", className)}>
@@ -194,11 +210,14 @@ export default function ContractBuilder({ projects, className }: ContractBuilder
             </div>
             
             <div className="mt-6 space-y-3">
-              <Button className="w-full">
-                Save as {contractType === "estimate" ? "Estimate" : "Contract"}
+              <Button className="w-full" onClick={() => handleSave('contract')}>
+                Save as Contract
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => handleSave('estimate')}>
+                Save as Estimate
               </Button>
               {contractType === "estimate" && (
-                <Button variant="outline" className="w-full">
+                <Button variant="ghost" className="w-full text-blue-600">
                   Convert to Contract
                 </Button>
               )}

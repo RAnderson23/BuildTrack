@@ -8,7 +8,8 @@ import {
   Receipt, 
   FileText, 
   Bell, 
-  User
+  User,
+  Users
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -22,6 +23,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Clients", href: "/clients", icon: Users },
     { name: "Projects", href: "/projects", icon: Building },
     { name: "Receipts", href: "/receipts", icon: Receipt },
     { name: "Contracts", href: "/contracts", icon: FileText },

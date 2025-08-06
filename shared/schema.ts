@@ -181,7 +181,10 @@ export const receiptLineItemsRelations = relations(receiptLineItems, ({ one }) =
 
 // Insert schemas
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
-export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
+export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true }).extend({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
 export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true });
 export const insertLineItemSchema = createInsertSchema(lineItems).omit({ id: true, createdAt: true });
 export const insertReceiptSchema = createInsertSchema(receipts).omit({ id: true, createdAt: true });
@@ -190,6 +193,32 @@ export const insertReceiptLineItemSchema = createInsertSchema(receiptLineItems).
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Products/SKU table for automated SKU management
+export const products = pgTable("products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sku: varchar("sku").notNull().unique(),
+  name: varchar("name").notNull(),
+  description: varchar("description"),
+  category: varchar("category"),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  unit: varchar("unit").default("each"), // each, linear ft, sq ft, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const productsRelations = relations(products, ({ one }) => ({
+  user: one(users, {
+    fields: [products.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type InsertProduct = typeof products.$inferInsert;
+export type Product = typeof products.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;

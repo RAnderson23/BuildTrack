@@ -6,6 +6,7 @@ import {
   lineItems,
   receipts,
   receiptLineItems,
+  products,
   type User,
   type UpsertUser,
   type InsertClient,
@@ -20,6 +21,8 @@ import {
   type Receipt,
   type InsertReceiptLineItem,
   type ReceiptLineItem,
+  type InsertProduct,
+  type Product,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, isNull } from "drizzle-orm";
@@ -68,6 +71,16 @@ export interface IStorage {
   createReceiptLineItem(lineItem: InsertReceiptLineItem): Promise<ReceiptLineItem>;
   updateReceiptLineItem(id: string, lineItem: Partial<InsertReceiptLineItem>): Promise<ReceiptLineItem>;
   deleteReceiptLineItem(id: string): Promise<void>;
+
+  // Product/SKU operations
+  getProducts(userId: string): Promise<Product[]>;
+  getProduct(id: string): Promise<Product | undefined>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product>;
+  deleteProduct(id: string): Promise<void>;
+  findProductBySku(sku: string): Promise<Product | undefined>;
+  findSimilarProducts(userId: string, name: string): Promise<Product[]>;
+  generateNextSku(userId: string, category?: string): Promise<string>;
 
   // Dashboard queries
   getProjectStats(userId: string): Promise<{
@@ -271,6 +284,54 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReceiptLineItem(id: string): Promise<void> {
     await db.delete(receiptLineItems).where(eq(receiptLineItems.id, id));
+  }
+
+  // Product/SKU operations
+  async getProducts(userId: string): Promise<Product[]> {
+    return await db.select().from(products).where(eq(products.userId, userId)).orderBy(products.name);
+  }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [newProduct] = await db.insert(products).values(product).returning();
+    return newProduct;
+  }
+
+  async updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product> {
+    const [updatedProduct] = await db.update(products).set(product).where(eq(products.id, id)).returning();
+    return updatedProduct;
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
+  }
+
+  async findProductBySku(sku: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.sku, sku));
+    return product;
+  }
+
+  async findSimilarProducts(userId: string, name: string): Promise<Product[]> {
+    return await db.select().from(products)
+      .where(and(
+        eq(products.userId, userId),
+        sql`${products.name} ILIKE ${`%${name}%`}`
+      ))
+      .limit(5);
+  }
+
+  async generateNextSku(userId: string, category = "GEN"): Promise<string> {
+    const prefix = category.substring(0, 3).toUpperCase();
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(products)
+      .where(and(eq(products.userId, userId), sql`${products.sku} LIKE ${prefix + '%'}`));
+    
+    const nextNumber = (result[0]?.count || 0) + 1;
+    return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
   }
 
   // Dashboard queries
