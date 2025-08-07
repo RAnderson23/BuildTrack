@@ -1,0 +1,62 @@
+# buildtrack_backend/app.py
+
+from flask import Flask, request, jsonify
+from replit import db
+import uuid
+
+app = Flask(__name__)
+
+# -------- Clients --------
+@app.route('/clients', methods=['POST'])
+def create_client():
+    data = request.get_json()
+    client_id = str(uuid.uuid4())
+    client = {
+        "id": client_id,
+        "name": data.get("name"),
+        "company": data.get("company"),
+        "email": data.get("email"),
+        "phone": data.get("phone")
+    }
+    if "clients" not in db:
+        db["clients"] = {}
+    clients = db["clients"]
+    clients[client_id] = client
+    db["clients"] = clients
+    return jsonify(client), 201
+
+@app.route('/clients', methods=['GET'])
+def list_clients():
+    clients = db.get("clients", {})
+    return jsonify(list(clients.values()))
+
+# -------- Contracts (Stub) --------
+@app.route('/contracts', methods=['POST'])
+def create_contract():
+    data = request.get_json()
+    contract_id = str(uuid.uuid4())
+    contract = {
+        "id": contract_id,
+        "type": data.get("type"),
+        "project": data.get("project"),
+        "date": data.get("date"),
+        "line_items": data.get("lineItems"),
+        "subtotal": data.get("subtotal"),
+        "tax": data.get("tax"),
+        "total": data.get("total")
+    }
+    if "contracts" not in db:
+        db["contracts"] = {}
+    contracts = db["contracts"]
+    contracts[contract_id] = contract
+    db["contracts"] = contracts
+    return jsonify(contract), 201
+
+@app.route('/contracts', methods=['GET'])
+def list_contracts():
+    contracts = db.get("contracts", {})
+    return jsonify(list(contracts.values()))
+
+# -------- Run App --------
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=3000)
