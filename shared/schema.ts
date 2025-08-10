@@ -63,7 +63,7 @@ export const projects = pgTable("projects", {
 });
 
 // Contracts table
-export const contracts: any = pgTable("contracts", {
+  export const contracts = pgTable("contracts", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   parentContractId: uuid("parent_contract_id"),

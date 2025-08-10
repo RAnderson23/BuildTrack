@@ -1,3 +1,6 @@
+// Fix for client/src/pages/contracts.tsx
+// Replace the current contracts.tsx with this updated version
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, FileText, Eye, Edit, MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
@@ -42,12 +46,6 @@ export default function Contracts() {
     enabled: !!isAuthenticated,
   });
 
-  // Get all contracts for all projects
-  const contractQueries = projects?.map((project: any) => ({
-    queryKey: ["/api/projects", project.id, "contracts"],
-    enabled: !!isAuthenticated,
-  })) || [];
-
   const handleNewContract = () => {
     setSelectedContract(null);
     setShowContractBuilder(true);
@@ -65,7 +63,7 @@ export default function Contracts() {
       pending: "status-pending",
       draft: "status-planning",
     };
-    
+
     return (
       <span className={statusClasses[status as keyof typeof statusClasses] || "status-pending"}>
         {status?.charAt(0).toUpperCase() + status?.slice(1)}
@@ -81,12 +79,12 @@ export default function Contracts() {
         </span>
       );
     }
-    
+
     const typeClasses = {
       contract: "bg-blue-100 text-blue-800",
       estimate: "bg-slate-100 text-slate-800",
     };
-    
+
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeClasses[type as keyof typeof typeClasses] || typeClasses.estimate}`}>
         {type?.charAt(0).toUpperCase() + type?.slice(1)}
@@ -106,7 +104,7 @@ export default function Contracts() {
     );
   }
 
-  // Mock contracts data for now - in real app, this would be fetched from API
+  // Mock contracts data for now
   const mockContracts = [
     {
       id: '1',
@@ -130,17 +128,6 @@ export default function Contracts() {
       status: 'pending',
       createdAt: '2024-03-10',
     },
-    {
-      id: '3',
-      contractNumber: 'CHG-2024-001',
-      title: 'Additional Electrical Work',
-      projectName: 'Kitchen Remodel',
-      type: 'contract',
-      isChangeOrder: true,
-      totalAmount: '3200.00',
-      status: 'draft',
-      createdAt: '2024-03-20',
-    },
   ];
 
   return (
@@ -156,11 +143,21 @@ export default function Contracts() {
         </Button>
       </div>
 
-      {/* Contract Builder Preview */}
-      <ContractBuilder 
-        projects={projects || []}
-        className="mb-6"
-      />
+      {/* Contract Builder Modal */}
+      <Dialog open={showContractBuilder} onOpenChange={setShowContractBuilder}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedContract ? "Edit Contract" : "Create New Contract"}
+            </DialogTitle>
+          </DialogHeader>
+          <ContractBuilder 
+            projects={projects || []}
+            contract={selectedContract}
+            onClose={() => setShowContractBuilder(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Existing Contracts Table */}
       <Card>
@@ -215,19 +212,13 @@ export default function Contracts() {
                         {getStatusBadge(contract.status)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="space-x-2">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {contract.isChangeOrder && (
-                            <Button variant="ghost" size="sm" className="text-amber-600">
-                              Change Order
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="sm" onClick={() => handleEditContract(contract)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditContract(contract)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
