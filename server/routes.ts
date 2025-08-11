@@ -28,7 +28,9 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|pdf/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const extname = allowedTypes.test(
+      path.extname(file.originalname).toLowerCase(),
+    );
     const mimetype = allowedTypes.test(file.mimetype);
 
     if (mimetype && extname) {
@@ -69,15 +71,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clients", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // ===== ADD THIS DEBUG SECTION =====
+      console.log("===== DEBUG INFO =====");
+      console.log("req.user:", req.user);
+      console.log("req.user.claims:", req.user?.claims);
+      console.log("req.user.claims.sub:", req.user?.claims?.sub);
+      console.log("Request body:", req.body);
 
-      // DO NOT include userId in validation!
+      const userId = req.user?.claims?.sub;
+
+      if (!userId) {
+        console.error("NO USER ID FOUND! User object:", req.user);
+        return res
+          .status(401)
+          .json({ message: "User not authenticated properly" });
+      }
+
+      console.log("User ID found:", userId);
+      // ===== END DEBUG SECTION =====
+
+      // Your existing code continues here
       const validatedData = insertClientSchema.parse(req.body);
 
-      // Add userId AFTER validation
       const clientDataWithUser = {
         ...validatedData,
-        userId: userId  // Add userId here
+        userId: userId,
       };
 
       console.log("Creating client with data:", clientDataWithUser);
@@ -87,21 +105,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Client created successfully:", client);
 
       res.json(client);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating client - Full error:", error);
 
-      if (error.name === 'ZodError') {
+      if (error.name === "ZodError") {
         console.error("Validation error details:", error.errors);
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Validation failed",
-          errors: error.errors 
+          errors: error.errors,
         });
       }
 
       res.status(400).json({ message: "Failed to create client" });
     }
   });
-
 
   app.put("/api/clients/:id", isAuthenticated, async (req: any, res) => {
     try {
@@ -153,11 +170,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating project - Full error:", error);
 
-      if (error.name === 'ZodError') {
+      if (error.name === "ZodError") {
         console.error("Validation error details:", error.errors);
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Validation failed",
-          errors: error.errors 
+          errors: error.errors,
         });
       }
 
@@ -189,16 +206,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contract routes
-  app.get("/api/projects/:projectId/contracts", isAuthenticated, async (req: any, res) => {
-    try {
-      const { projectId } = req.params;
-      const contracts = await storage.getContracts(projectId);
-      res.json(contracts);
-    } catch (error) {
-      console.error("Error fetching contracts:", error);
-      res.status(500).json({ message: "Failed to fetch contracts" });
-    }
-  });
+  app.get(
+    "/api/projects/:projectId/contracts",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { projectId } = req.params;
+        const contracts = await storage.getContracts(projectId);
+        res.json(contracts);
+      } catch (error) {
+        console.error("Error fetching contracts:", error);
+        res.status(500).json({ message: "Failed to fetch contracts" });
+      }
+    },
+  );
 
   app.post("/api/contracts", isAuthenticated, async (req: any, res) => {
     try {
@@ -224,16 +245,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Line item routes
-  app.get("/api/contracts/:contractId/line-items", isAuthenticated, async (req: any, res) => {
-    try {
-      const { contractId } = req.params;
-      const lineItems = await storage.getLineItems(contractId);
-      res.json(lineItems);
-    } catch (error) {
-      console.error("Error fetching line items:", error);
-      res.status(500).json({ message: "Failed to fetch line items" });
-    }
-  });
+  app.get(
+    "/api/contracts/:contractId/line-items",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { contractId } = req.params;
+        const lineItems = await storage.getLineItems(contractId);
+        res.json(lineItems);
+      } catch (error) {
+        console.error("Error fetching line items:", error);
+        res.status(500).json({ message: "Failed to fetch line items" });
+      }
+    },
+  );
 
   app.post("/api/line-items", isAuthenticated, async (req: any, res) => {
     try {
@@ -281,38 +306,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/receipts/upload", isAuthenticated, upload.single("receipt"), async (req: any, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+  app.post(
+    "/api/receipts/upload",
+    isAuthenticated,
+    upload.single("receipt"),
+    async (req: any, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const userId = req.user.claims.sub;
+        const { projectId, contractId } = req.body;
+
+        // Create receipt record
+        const receiptData = insertReceiptSchema.parse({
+          projectId: projectId || null,
+          contractId: contractId || null,
+          fileName: req.file.originalname,
+          filePath: req.file.path,
+          status: "pending",
+          aiParsed: false,
+        });
+
+        const receipt = await storage.createReceipt(receiptData);
+
+        // Parse receipt with AI in background
+        parseReceiptWithAI(receipt.id, req.file.path).catch((error) => {
+          console.error("AI parsing failed:", error);
+        });
+
+        res.json(receipt);
+      } catch (error) {
+        console.error("Error uploading receipt:", error);
+        res.status(500).json({ message: "Failed to upload receipt" });
       }
-
-      const userId = req.user.claims.sub;
-      const { projectId, contractId } = req.body;
-
-      // Create receipt record
-      const receiptData = insertReceiptSchema.parse({
-        projectId: projectId || null,
-        contractId: contractId || null,
-        fileName: req.file.originalname,
-        filePath: req.file.path,
-        status: "pending",
-        aiParsed: false,
-      });
-
-      const receipt = await storage.createReceipt(receiptData);
-
-      // Parse receipt with AI in background
-      parseReceiptWithAI(receipt.id, req.file.path).catch((error) => {
-        console.error("AI parsing failed:", error);
-      });
-
-      res.json(receipt);
-    } catch (error) {
-      console.error("Error uploading receipt:", error);
-      res.status(500).json({ message: "Failed to upload receipt" });
-    }
-  });
+    },
+  );
 
   app.put("/api/receipts/:id", isAuthenticated, async (req: any, res) => {
     try {
@@ -338,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product routes for automated SKU management
-  app.get('/api/products', isAuthenticated, async (req: any, res) => {
+  app.get("/api/products", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const products = await storage.getProducts(userId);
@@ -349,16 +379,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/products', isAuthenticated, async (req: any, res) => {
+  app.post("/api/products", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const productData = insertProductSchema.parse({ ...req.body, userId });
-      
+
       // Auto-generate SKU if not provided
       if (!productData.sku) {
-        productData.sku = await storage.generateNextSku(userId, productData.category);
+        productData.sku = await storage.generateNextSku(
+          userId,
+          productData.category,
+        );
       }
-      
+
       const product = await storage.createProduct(productData);
       res.json(product);
     } catch (error) {
@@ -367,17 +400,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/products/similar/:name', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { name } = req.params;
-      const similar = await storage.findSimilarProducts(userId, decodeURIComponent(name));
-      res.json(similar);
-    } catch (error) {
-      console.error("Error finding similar products:", error);
-      res.status(500).json({ message: "Failed to find similar products" });
-    }
-  });
+  app.get(
+    "/api/products/similar/:name",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const { name } = req.params;
+        const similar = await storage.findSimilarProducts(
+          userId,
+          decodeURIComponent(name),
+        );
+        res.json(similar);
+      } catch (error) {
+        console.error("Error finding similar products:", error);
+        res.status(500).json({ message: "Failed to find similar products" });
+      }
+    },
+  );
 
   // Dashboard stats
   app.get("/api/dashboard/stats", isAuthenticated, async (req: any, res) => {
