@@ -1,19 +1,15 @@
+// Simplified version of ClientModal.tsx for testing
+// This removes react-hook-form to isolate the issue
+
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import { insertClientSchema } from "@shared/schema";
-import type { z } from "zod";
-
-type InsertClient = z.infer<typeof insertClientSchema>;
 
 interface ClientModalProps {
   open: boolean;
@@ -26,56 +22,59 @@ export function ClientModal({ open, onOpenChange, client }: ClientModalProps) {
   const queryClient = useQueryClient();
   const isEditing = !!client;
 
-  const form = useForm<InsertClient>({
-    resolver: zodResolver(insertClientSchema),
-    defaultValues: {
-      name: client?.name || "",
-      email: client?.email || "",
-      phone: client?.phone || "",
-      address: client?.address || "",
-      notes: client?.notes || "",
-    },
+  // Simple state instead of react-hook-form
+  const [formData, setFormData] = useState({
+    name: client?.name || "",
+    email: client?.email || "",
+    phone: client?.phone || "",
+    address: client?.address || "",
+    notes: client?.notes || "",
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: InsertClient) => {
+    mutationFn: async (data: typeof formData) => {
+      console.log("Sending data to server:", data);
+
       if (isEditing) {
         return await apiRequest("PUT", `/api/clients/${client.id}`, data);
       } else {
         return await apiRequest("POST", "/api/clients", data);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Success! Response:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       onOpenChange(false);
-      form.reset();
       toast({
         title: "Success",
         description: `Client ${isEditing ? "updated" : "created"} successfully`,
       });
     },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+    onError: (error: any) => {
+      console.error("Error:", error);
       toast({
         title: "Error",
-        description: `Failed to ${isEditing ? "update" : "create"} client`,
+        description: error.response?.data?.message || `Failed to ${isEditing ? "update" : "create"} client`,
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: InsertClient) => {
-    mutation.mutate(data);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Form submitted with data:", formData);
+
+    // Basic validation
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Client name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    mutation.mutate(formData);
   };
 
   return (
@@ -84,101 +83,82 @@ export function ClientModal({ open, onOpenChange, client }: ClientModalProps) {
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Client" : "Add New Client"}</DialogTitle>
         </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter client name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Client Name *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => {
+                console.log("Name changed to:", e.target.value);
+                setFormData({ ...formData, name: e.target.value });
+              }}
+              placeholder="Enter client name"
+              required
             />
-            
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="client@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          </div>
+
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="client@example.com"
             />
-            
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <Input placeholder="(555) 123-4567" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          </div>
+
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="(555) 123-4567"
             />
-            
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Enter client address" 
-                      className="min-h-[60px]"
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          </div>
+
+          <div>
+            <Label htmlFor="address">Address</Label>
+            <Textarea
+              id="address"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="Enter client address"
+              className="min-h-[60px]"
             />
-            
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Additional notes about the client" 
-                      className="min-h-[60px]"
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          </div>
+
+          <div>
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Additional notes about the client"
+              className="min-h-[60px]"
             />
-            
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "Saving..." : (isEditing ? "Update Client" : "Create Client")}
-              </Button>
-            </div>
-          </form>
-        </Form>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={mutation.isPending}
+              onClick={() => console.log("Submit button clicked!")}
+            >
+              {mutation.isPending ? "Saving..." : (isEditing ? "Update Client" : "Create Client")}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

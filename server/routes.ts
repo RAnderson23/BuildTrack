@@ -70,14 +70,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/clients", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const clientData = insertClientSchema.parse({ ...req.body, userId });
-      const client = await storage.createClient(clientData);
+
+      // DO NOT include userId in validation!
+      const validatedData = insertClientSchema.parse(req.body);
+
+      // Add userId AFTER validation
+      const clientDataWithUser = {
+        ...validatedData,
+        userId: userId  // Add userId here
+      };
+
+      console.log("Creating client with data:", clientDataWithUser);
+
+      const client = await storage.createClient(clientDataWithUser);
+
+      console.log("Client created successfully:", client);
+
       res.json(client);
     } catch (error) {
-      console.error("Error creating client:", error);
+      console.error("Error creating client - Full error:", error);
+
+      if (error.name === 'ZodError') {
+        console.error("Validation error details:", error.errors);
+        return res.status(400).json({ 
+          message: "Validation failed",
+          errors: error.errors 
+        });
+      }
+
       res.status(400).json({ message: "Failed to create client" });
     }
   });
+
 
   app.put("/api/clients/:id", isAuthenticated, async (req: any, res) => {
     try {
@@ -116,11 +140,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects", isAuthenticated, async (req: any, res) => {
     try {
-      const projectData = insertProjectSchema.parse(req.body);
-      const project = await storage.createProject(projectData);
+      // Validate the incoming data
+      const validatedData = insertProjectSchema.parse(req.body);
+
+      console.log("Creating project with data:", validatedData);
+
+      const project = await storage.createProject(validatedData);
+
+      console.log("Project created successfully:", project);
+
       res.json(project);
     } catch (error) {
-      console.error("Error creating project:", error);
+      console.error("Error creating project - Full error:", error);
+
+      if (error.name === 'ZodError') {
+        console.error("Validation error details:", error.errors);
+        return res.status(400).json({ 
+          message: "Validation failed",
+          errors: error.errors 
+        });
+      }
+
       res.status(400).json({ message: "Failed to create project" });
     }
   });

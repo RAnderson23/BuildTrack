@@ -45,6 +45,7 @@ export const clients = pgTable("clients", {
   email: varchar("email"),
   phone: varchar("phone"),
   address: text("address"),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
