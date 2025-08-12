@@ -157,27 +157,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/projects", isAuthenticated, async (req: any, res) => {
     try {
-      // Validate the incoming data
-      const validatedData = insertProjectSchema.parse(req.body);
+      const projectData = insertProjectSchema.parse(req.body);
 
-      console.log("Creating project with data:", validatedData);
+      // Convert date strings to Date objects if they exist
+      const projectDataWithDates = {
+        ...projectData,
+        startDate: projectData.startDate ? new Date(projectData.startDate) : null,
+        endDate: projectData.endDate ? new Date(projectData.endDate) : null,
+      };
 
-      const project = await storage.createProject(validatedData);
+      console.log("Creating project with data:", projectDataWithDates);
+
+      const project = await storage.createProject(projectDataWithDates);
 
       console.log("Project created successfully:", project);
 
       res.json(project);
     } catch (error) {
       console.error("Error creating project - Full error:", error);
-
-      if (error.name === "ZodError") {
-        console.error("Validation error details:", error.errors);
-        return res.status(400).json({
-          message: "Validation failed",
-          errors: error.errors,
-        });
-      }
-
       res.status(400).json({ message: "Failed to create project" });
     }
   });
