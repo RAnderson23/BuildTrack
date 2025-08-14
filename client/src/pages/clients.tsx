@@ -1,11 +1,15 @@
+// client/src/pages/clients.tsx
+// COMPLETE UPDATED VERSION with ClientDetailModal integration
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Plus, Edit2, Trash2 } from "lucide-react";
+import { Users, Plus, Edit2, Trash2, Eye } from "lucide-react"; // Added Eye icon
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { ClientModal } from "@/components/ClientModal";
+import { ClientDetailModal } from "@/components/ClientDetailModal"; // NEW IMPORT
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Client } from "@shared/schema";
@@ -13,6 +17,8 @@ import type { Client } from "@shared/schema";
 export default function ClientsPage() {
   const [showClientModal, setShowClientModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [showClientDetail, setShowClientDetail] = useState(false); // NEW STATE
+  const [detailClient, setDetailClient] = useState<Client | null>(null); // NEW STATE
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -65,6 +71,12 @@ export default function ClientsPage() {
   const handleNewClient = () => {
     setSelectedClient(null);
     setShowClientModal(true);
+  };
+
+  // NEW FUNCTION: Handle viewing client details
+  const handleViewClient = (client: Client) => {
+    setDetailClient(client);
+    setShowClientDetail(true);
   };
 
   if (isLoading) {
@@ -124,7 +136,11 @@ export default function ClientsPage() {
                 </TableHeader>
                 <TableBody>
                   {clients.map((client) => (
-                    <TableRow key={client.id} className="hover:bg-slate-50">
+                    <TableRow 
+                      key={client.id} 
+                      className="hover:bg-slate-50 cursor-pointer"
+                      onClick={() => handleViewClient(client)} // NEW: Make row clickable
+                    >
                       <TableCell>
                         <div className="font-medium text-slate-900">{client.name}</div>
                         {client.notes && (
@@ -148,19 +164,38 @@ export default function ClientsPage() {
                         {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : 'Recently'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="space-x-2">
+                        <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleEditClient(client)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // NEW: Prevent row click
+                              handleViewClient(client);
+                            }}
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation(); // NEW: Prevent row click
+                              handleEditClient(client);
+                            }}
+                            title="Edit Client"
                           >
                             <Edit2 className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteClient(client.id)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // NEW: Prevent row click
+                              handleDeleteClient(client.id);
+                            }}
                             disabled={deleteClientMutation.isPending}
+                            title="Delete Client"
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
@@ -175,11 +210,25 @@ export default function ClientsPage() {
         </CardContent>
       </Card>
 
+      {/* Existing ClientModal for create/edit */}
       <ClientModal
         open={showClientModal}
         onOpenChange={setShowClientModal}
         client={selectedClient}
       />
+
+      {/* NEW: ClientDetailModal for viewing details */}
+      {showClientDetail && detailClient && (
+        <ClientDetailModal
+          open={showClientDetail}
+          onOpenChange={setShowClientDetail}
+          client={detailClient}
+          onEdit={() => {
+            setShowClientDetail(false);
+            handleEditClient(detailClient);
+          }}
+        />
+      )}
     </div>
   );
 }

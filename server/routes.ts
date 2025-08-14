@@ -155,27 +155,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects", isAuthenticated, async (req: any, res) => {
+  app.put("/api/projects/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const projectData = insertProjectSchema.parse(req.body);
+      const { id } = req.params;
+      const projectData = insertProjectSchema.partial().parse(req.body);
 
       // Convert date strings to Date objects if they exist
       const projectDataWithDates = {
         ...projectData,
-        startDate: projectData.startDate ? new Date(projectData.startDate) : null,
-        endDate: projectData.endDate ? new Date(projectData.endDate) : null,
+        startDate: projectData.startDate ? new Date(projectData.startDate) : undefined,
+        endDate: projectData.endDate ? new Date(projectData.endDate) : undefined,
       };
 
-      console.log("Creating project with data:", projectDataWithDates);
+      // Remove undefined values (only update fields that were provided)
+      Object.keys(projectDataWithDates).forEach(key => {
+        if (projectDataWithDates[key] === undefined) {
+          delete projectDataWithDates[key];
+        }
+      });
 
-      const project = await storage.createProject(projectDataWithDates);
+      console.log("Updating project with data:", projectDataWithDates);
 
-      console.log("Project created successfully:", project);
+      const project = await storage.updateProject(id, projectDataWithDates);
+
+      console.log("Project updated successfully:", project);
 
       res.json(project);
     } catch (error) {
-      console.error("Error creating project - Full error:", error);
-      res.status(400).json({ message: "Failed to create project" });
+      console.error("Error updating project:", error);
+      res.status(400).json({ message: "Failed to update project" });
     }
   });
 
